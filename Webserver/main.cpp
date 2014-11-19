@@ -24,6 +24,9 @@ char* status200 = "200 OK";
 char* status400 = "400 Bad Request";
 char* status404 = "404 Not Found";
 
+char* body400 = "<h1>400 Bad Request</h1>";
+char* body404 = "<h1>404 Not Found</h1>";
+
 //
 
 void WorkerThread(SOCKET s);
@@ -135,10 +138,16 @@ void WorkerThread(SOCKET s)
 
 	} while (true);
 
-loopbreak:
+	if (recvBytes == 0)
+	{
+		closesocket(s);
+		return;
+	}
 
+loopbreak:
 	memcpy_s(header, recvBytes + 1, buf, recvBytes);
 	header[recvBytes] = '\0';
+	puts(header);
 
 	char* context = nullptr;
 	char* token = nullptr;
@@ -151,7 +160,8 @@ loopbreak:
 		if (!token)
 		{
 			// 400
-			sprintf_s(buf, "%s %s\r\n%s\r\n\r\n", httpVersion, status400, dateHeader);
+			sprintf_s(buf, "%s %s\r\n%s\r\nContent-Length:%d\r\n\r\n%s", httpVersion, status400, dateHeader, strlen(body400), body400);
+			puts(buf);
 			Send(s, buf, strlen(buf));
 			break;
 		}
@@ -164,14 +174,20 @@ loopbreak:
 			if (errno == ENOENT)
 			{
 				// 404
-				sprintf_s(buf, "%s %s\r\n%s\r\n\r\n", httpVersion, status404, dateHeader);
+				sprintf_s(buf, "%s %s\r\n%s\r\nContent-Length:%d\r\n\r\n%s", httpVersion, status404, dateHeader, strlen(body404), body404);
+				puts(buf);
 				Send(s, buf, strlen(buf));
-				break;
 			}
+			break;
 		}
 
+		fseek(file, 0, SEEK_END);
+		int size = ftell(file);
+		fseek(file, 0, SEEK_SET);
+
 		// 200
-		sprintf_s(buf, "%s %s\r\n%s\r\n\r\n", httpVersion, status200, dateHeader);
+		sprintf_s(buf, "%s %s\r\n%s\r\nContent-Length:%d\r\n\r\n", httpVersion, status200, dateHeader, size);
+		puts(buf);
 		Send(s, buf, strlen(buf));
 
 		do
@@ -183,6 +199,8 @@ loopbreak:
 		fclose(file);
 
 	} while (false);
+
+	Sleep(10);
 	
 	closesocket(s);
 }
